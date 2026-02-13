@@ -1,4 +1,62 @@
 \chapter{Introduction}
 \label{chap:introduction}
+This chapter some basics on blockchain concepts useful to understand this project. 
 
-Ever since the development of Bitcoin, developers have been questioning how to combine them with machine learning.
+\section{What is a blockchain?}
+A blockchain is an immutable ledger that enables the recording of transactions in a P2P network, providing a single source 
+of truth. The first one was invented by Satoshi Nakamoto in 2008 with the release of the Bitcoin whitepaper 
+\cite{nakamoto2008bitcoin}. It developed a fully peer-to-peer (P2P) network where users can exchange a 
+currency (bitcoin) without third party authorities with the power of rewriting the history of transactions. 
+
+A blockchain can be described as a system made of multiple components, the foundamentals are: 
+\begin{itemize}
+  \item a P2P network of nodes; 
+  \item a consensus algorithm;
+  \item a chain of blocks, containing the verified transactions.
+\end{itemize}
+
+There are many variants of blockchains, an important difference to consider to classify them is who can access the network. 
+In a \b{permissionless} blockchain (like Ethereum or Bitcoin) anybody can access, anyone can participate in the consensus; \b{permissioned} blockchains,
+on the other hand, restrict the access using a whitelist for trusted peers. 
+
+\subsection{Cryptography primitives}
+Blockchains rely heavily on cryptographic techniques to ensure security and trust. The main cryptographic tools used are:
+
+\textbf{Hash functions} are one-way mathematical functions that take any input and produce a fixed-size output (called a hash or digest). They are deterministic, meaning the same input always produces the same output. However, it is computationally impossible to reverse the process or find two different inputs that produce the same hash. Bitcoin and Ethereum use SHA-256 and Keccak-256 hash functions respectively.
+
+\textbf{Digital signatures} allow users to prove ownership of their assets and authorize transactions. Each user has a private key (which must be kept secret) and a public key (which can be shared). To send a transaction, a user signs it with their private key. Anyone can verify the signature using the user's public key, proving that the transaction was authorized by the owner of that private key. Most blockchains use elliptic curve cryptography for digital signatures.
+
+\subsection{How transactions work}
+When a user wants to make a transaction on a blockchain, they create a message containing the details (such as the recipient and amount) and sign it with their private key. This signed transaction is then broadcast to the P2P network.
+
+Nodes in the network collect these transactions and group them into blocks. Before a block can be added to the blockchain, it must be validated through the consensus mechanism. Once consensus is reached, the block is added to the chain, and all nodes update their copy of the ledger. This process ensures that all participants have the same view of transaction history.
+
+The chain structure is maintained by including the hash of the previous block in each new block. This creates a tamper-proof link: if someone tries to modify an old transaction, it would change that block's hash, breaking the link to all subsequent blocks. This is why blockchains are described as immutable.
+
+\subsection{Consensus mechanisms}
+The consensus mechanism is how the network agrees on which transactions are valid and the order in which they should be recorded. This is a critical challenge in distributed systems, where nodes might be unreliable or malicious.
+
+Bitcoin introduced \textbf{Proof of Work} (PoW), where nodes (called miners) compete to solve complex mathematical puzzles. The first miner to solve the puzzle gets to add the next block and receives a reward. This process requires significant computational power, making it expensive to attack the network.
+
+Other consensus mechanisms have been developed to address PoW's high energy consumption. \textbf{Proof of Stake} (PoS) selects validators based on the amount of cryptocurrency they have locked up as collateral. Validators who act dishonestly risk losing their stake, creating an economic incentive for honest behavior.
+
+\section{Ethereum and smart contracts}
+While Bitcoin was designed primarily as a digital currency, Ethereum extended the blockchain concept to support general-purpose computation \cite{antonopoulos2018mastering}. Launched in 2015, Ethereum introduced \textbf{smart contracts}: programs that run on the blockchain and automatically execute when certain conditions are met.
+
+A smart contract is written in a programming language (such as Solidity) and deployed to the blockchain. Once deployed, the contract's code cannot be changed, and it will execute exactly as programmed whenever someone interacts with it. This enables the creation of decentralized applications (DApps) that can operate without central control.
+
+Smart contracts are executed by the \textbf{Ethereum Virtual Machine} (EVM), a computational environment that runs on every node in the network. When a transaction calls a smart contract, every node executes the same code and updates their state accordingly. This ensures that all nodes maintain the same state.
+
+To prevent infinite loops and abuse, Ethereum uses a concept called \textbf{gas}. Every computation on the EVM costs a certain amount of gas, and users must pay for the gas their transactions consume. This creates a market for block space and compensates validators for processing transactions.
+
+\subsection{Decentralized applications}
+Smart contracts enable a wide range of applications beyond simple payments. Some examples include:
+
+\begin{itemize}
+  \item \textbf{Decentralized Finance (DeFi)}: Financial services like lending, borrowing, and trading without traditional intermediaries.
+  \item \textbf{Non-Fungible Tokens (NFTs)}: Unique digital assets that represent ownership of items like art, collectibles, or real-world assets.
+  \item \textbf{Decentralized Autonomous Organizations (DAOs)}: Organizations governed by smart contracts where decisions are made through voting by token holders.
+  \item \textbf{Supply chain tracking}: Recording the movement of goods through a supply chain with transparency and immutability.
+\end{itemize}
+
+The key advantage of these applications is that they inherit the blockchain's properties: they are transparent, censorship-resistant, and don't require trust in a central authority. However, they also face challenges such as scalability, high transaction costs, and the irreversibility of bugs in smart contract code.

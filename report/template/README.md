@@ -25,7 +25,7 @@ You can now run:
 
 Alternatively you can use `latexmk`:
   ```
-    latexmk -pdf main
+    latexmk -pdf main && open "/Users/nick/Documents/AAVE-module/report/template/main.pdf"
   ```
 
 Another alternative is to install `make` and simply run it.
