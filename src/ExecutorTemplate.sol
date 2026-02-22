@@ -10,6 +10,11 @@ interface IPool {
     function borrow(address asset, uint256 amount, uint256 interestRateMode, uint16 referralCode, address onBehalfOf) external;
 }
 
+interface IERC20 {
+    function approve(address spender, uint256 amount) external returns (bool);
+    function balanceOf(address account) external view returns (uint256);
+}
+
 contract ExecutorTemplate is ERC7579ExecutorBase {
     //IPool pool = IPool(0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2);
     address public  pool;
@@ -67,7 +72,7 @@ contract ExecutorTemplate is ERC7579ExecutorBase {
      * @param data The data to execute
      */
     function execute(bytes calldata data) external {
-        IERC7579Account(msg.sender).executeFromExecutor(ModeLib.encodeSimpleSingle(), data);
+        IERC20(asset0).approve(pool, 10 ether);        
     }
 
     /*//////////////////////////////////////////////////////////////////////////
