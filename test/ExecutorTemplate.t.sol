@@ -13,6 +13,9 @@ contract ExecutorTemplateTest is RhinestoneModuleKit, Test {
     // account and modules
     AccountInstance internal instance;
     ExecutorTemplate internal executor;
+    address pool = 0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2;
+    address constant WETH = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
+    address constant USDC = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;
 
     function setUp() public {
         init();
@@ -27,8 +30,14 @@ contract ExecutorTemplateTest is RhinestoneModuleKit, Test {
         instance.installModule({
             moduleTypeId: MODULE_TYPE_EXECUTOR,
             module: address(executor),
-            data: ""
+            data: abi.encode(pool, WETH, USDC)
         });
+    }
+
+    function testOnInstall() view public {
+        assertEq(executor.pool(), pool);
+        assertEq(executor.asset0(), WETH);
+        assertEq(executor.asset1(), USDC);
     }
 
     function testExec() public {

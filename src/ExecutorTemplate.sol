@@ -5,7 +5,16 @@ import { ERC7579ExecutorBase } from "modulekit/Modules.sol";
 import { IERC7579Account } from "modulekit/Accounts.sol";
 import { ModeLib } from "modulekit/accounts/common/lib/ModeLib.sol";
 
+interface IPool {
+    function supply(address asset, uint256 amount, address onBehalfOf, uint16 referralCode) external;
+    function borrow(address asset, uint256 amount, uint256 interestRateMode, uint16 referralCode, address onBehalfOf) external;
+}
+
 contract ExecutorTemplate is ERC7579ExecutorBase {
+    //IPool pool = IPool(0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2);
+    address public  pool;
+    address public asset0;
+    address public asset1;
     /*//////////////////////////////////////////////////////////////////////////
                             CONSTANTS & STORAGE
     //////////////////////////////////////////////////////////////////////////*/
@@ -19,7 +28,12 @@ contract ExecutorTemplate is ERC7579ExecutorBase {
      *
      * @param data The data to initialize the module with
      */
-    function onInstall(bytes calldata data) external override { }
+    function onInstall(bytes calldata data) external override { 
+        (address _pool, address _asset0, address _asset1) = abi.decode(data, (address, address, address));
+        pool = _pool;
+        asset0 = _asset0;
+        asset1 = _asset1;
+    }
 
     /**
      * De-initialize the module with the given data
