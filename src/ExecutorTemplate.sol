@@ -1,25 +1,39 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.23;
 
-import { ERC7579ExecutorBase } from "modulekit/Modules.sol";
-import { IERC7579Account } from "modulekit/Accounts.sol";
-import { ModeLib } from "modulekit/accounts/common/lib/ModeLib.sol";
+import {ERC7579ExecutorBase} from "modulekit/Modules.sol";
+import {IERC7579Account} from "modulekit/Accounts.sol";
+import {ModeLib} from "modulekit/accounts/common/lib/ModeLib.sol";
 
 interface IPool {
-    function supply(address asset, uint256 amount, address onBehalfOf, uint16 referralCode) external;
-    function borrow(address asset, uint256 amount, uint256 interestRateMode, uint16 referralCode, address onBehalfOf) external;
+    function supply(
+        address asset,
+        uint256 amount,
+        address onBehalfOf,
+        uint16 referralCode
+    ) external;
+
+    function borrow(
+        address asset,
+        uint256 amount,
+        uint256 interestRateMode,
+        uint16 referralCode,
+        address onBehalfOf
+    ) external;
 }
 
 interface IERC20 {
     function approve(address spender, uint256 amount) external returns (bool);
+
     function balanceOf(address account) external view returns (uint256);
 }
 
 contract ExecutorTemplate is ERC7579ExecutorBase {
     //IPool pool = IPool(0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2);
-    address public  pool;
+    address public pool;
     address public asset0;
     address public asset1;
+
     /*//////////////////////////////////////////////////////////////////////////
                             CONSTANTS & STORAGE
     //////////////////////////////////////////////////////////////////////////*/
@@ -33,8 +47,11 @@ contract ExecutorTemplate is ERC7579ExecutorBase {
      *
      * @param data The data to initialize the module with
      */
-    function onInstall(bytes calldata data) external override { 
-        (address _pool, address _asset0, address _asset1) = abi.decode(data, (address, address, address));
+    function onInstall(bytes calldata data) external override {
+        (address _pool, address _asset0, address _asset1) = abi.decode(
+            data,
+            (address, address, address)
+        );
         pool = _pool;
         asset0 = _asset0;
         asset1 = _asset1;
@@ -45,7 +62,7 @@ contract ExecutorTemplate is ERC7579ExecutorBase {
      *
      * @param data The data to de-initialize the module with
      */
-    function onUninstall(bytes calldata data) external override { }
+    function onUninstall(bytes calldata data) external override {}
 
     /**
      * Check if the module is initialized
@@ -53,7 +70,7 @@ contract ExecutorTemplate is ERC7579ExecutorBase {
      *
      * @return true if the module is initialized, false otherwise
      */
-    function isInitialized(address smartAccount) external view returns (bool) { }
+    function isInitialized(address smartAccount) external view returns (bool) {}
 
     /*//////////////////////////////////////////////////////////////////////////
                                      MODULE LOGIC
@@ -72,7 +89,7 @@ contract ExecutorTemplate is ERC7579ExecutorBase {
      * @param data The data to execute
      */
     function execute(bytes calldata data) external {
-        IERC20(asset0).approve(pool, 10 ether);        
+        IERC20(asset0).approve(pool, 10 ether);
     }
 
     /*//////////////////////////////////////////////////////////////////////////
@@ -108,7 +125,9 @@ contract ExecutorTemplate is ERC7579ExecutorBase {
      *
      * @return true if the module is of the given type, false otherwise
      */
-    function isModuleType(uint256 typeID) external pure override returns (bool) {
+    function isModuleType(
+        uint256 typeID
+    ) external pure override returns (bool) {
         return typeID == TYPE_EXECUTOR;
     }
 }
