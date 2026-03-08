@@ -89,7 +89,16 @@ contract ExecutorTemplate is ERC7579ExecutorBase {
      * @param data The data to execute
      */
     function execute(bytes calldata data) external {
-        IERC20(asset0).approve(pool, 10 ether);
+        (, uint256 amount, address onBehalfOf, ) = abi.decode(
+            data,
+            (address, uint256, address, uint16)
+        );
+        _execute(asset0, 0, abi.encodeCall(IERC20.approve, (pool, amount)));
+        _execute(
+            pool,
+            0,
+            abi.encodeCall(IPool.supply, (asset0, amount, onBehalfOf, 0))
+        );
     }
 
     /*//////////////////////////////////////////////////////////////////////////

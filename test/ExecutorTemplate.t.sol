@@ -6,6 +6,7 @@ import {RhinestoneModuleKit, ModuleKitHelpers, AccountInstance} from "modulekit/
 import {MODULE_TYPE_EXECUTOR} from "modulekit/accounts/common/interfaces/IERC7579Module.sol";
 import {ExecutionLib} from "modulekit/accounts/erc7579/lib/ExecutionLib.sol";
 import {ExecutorTemplate} from "src/ExecutorTemplate.sol";
+import { ISpoke } from "aave-v4/src/spoke/interfaces/ISpoke.sol";
 
 interface IERC20 {
     function approve(address spender, uint256 amount) external returns (bool);
@@ -55,24 +56,23 @@ contract ExecutorTemplateTest is RhinestoneModuleKit, Test {
         deal(WETH, address(instance.account), 10 ether);
         // Encode the execution data sent to the account
 
-        // bytes memory supplyData = abi.encodeWithSignature(
-        //     "supply(address, uint256, address, uint16)",
-        //     WETH,
-        //     10 ether,
-        //     address(this),
-        //     0
-        // );
+        bytes memory supplyData = abi.encode(
+            WETH,
+            10 ether,
+            address(this),
+            0
+        );
         instance.exec({
             target: address(executor),
             value: 0,
             callData: abi.encodeWithSelector(
                 ExecutorTemplate.execute.selector,
-                "0x"
+                supplyData
             )
         });
         assertEq(
-            IERC20(WETH).allowance(address(executor), pool),
-            10 ether
+            IERC20(WETH).balanceOf(address(instance.account)),
+            0
         );
     }
 }
