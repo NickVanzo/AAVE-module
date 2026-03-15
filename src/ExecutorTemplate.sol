@@ -5,6 +5,14 @@ import {ERC7579ExecutorBase} from "modulekit/Modules.sol";
 import {IERC7579Account} from "modulekit/Accounts.sol";
 import {ModeLib} from "modulekit/accounts/common/lib/ModeLib.sol";
 
+library SmartAAVE {
+    enum ActionAAVE {
+        SUPPLY,
+        WITHDRAW,
+        VALID
+    }
+}
+
 interface IPool {
     function supply(
         address asset,
@@ -20,6 +28,8 @@ interface IPool {
         uint16 referralCode,
         address onBehalfOf
     ) external;
+
+    function withdraw(address asset, uint256 amount, address to) external;
 }
 
 interface IERC20 {
@@ -89,16 +99,32 @@ contract ExecutorTemplate is ERC7579ExecutorBase {
      * @param data The data to execute
      */
     function execute(bytes calldata data) external {
-        (, uint256 amount, address onBehalfOf, ) = abi.decode(
-            data,
-            (address, uint256, address, uint16)
-        );
-        _execute(asset0, 0, abi.encodeCall(IERC20.approve, (pool, amount)));
-        _execute(
-            pool,
-            0,
-            abi.encodeCall(IPool.supply, (asset0, amount, onBehalfOf, 0))
-        );
+        (
+            ,
+            uint256 amount,
+            address onBehalfOf,
+            ,
+            SmartAAVE.ActionAAVE action
+        ) = abi.decode(
+                data,
+                (address, uint256, address, uint16, SmartAAVE.ActionAAVE)
+            );
+        require(action < SmartAAVE.ActionAAVE.VALID, "action not valid");
+        if (action == SmartAAVE.ActionAAVE.SUPPLY) {
+            _execute(asset0, 0, abi.encodeCall(IERC20.approve, (pool, amount)));
+            _execute(
+                pool,
+                0,
+                abi.encodeCall(IPool.supply, (asset0, amount, onBehalfOf, 0))
+            );
+        }
+        if (action == SmartAAVE.ActionAAVE.WITHDRAW) {
+            _execute(
+                pool,
+                0,
+                abi.encodeCall(IPool.withdraw, (asset0, amount, onBehalfOf))
+            );
+        }
     }
 
     /*//////////////////////////////////////////////////////////////////////////

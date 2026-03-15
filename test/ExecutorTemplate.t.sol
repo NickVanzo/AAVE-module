@@ -6,7 +6,7 @@ import {RhinestoneModuleKit, ModuleKitHelpers, AccountInstance} from "modulekit/
 import {MODULE_TYPE_EXECUTOR} from "modulekit/accounts/common/interfaces/IERC7579Module.sol";
 import {ExecutionLib} from "modulekit/accounts/erc7579/lib/ExecutionLib.sol";
 import {ExecutorTemplate} from "src/ExecutorTemplate.sol";
-import { ISpoke } from "aave-v4/src/spoke/interfaces/ISpoke.sol";
+import {ISpoke} from "aave-v4/src/spoke/interfaces/ISpoke.sol";
 
 interface IERC20 {
     function approve(address spender, uint256 amount) external returns (bool);
@@ -52,14 +52,39 @@ contract ExecutorTemplateTest is RhinestoneModuleKit, Test {
         assertEq(executor.asset1(), USDC);
     }
 
-    function testExec() public {
+    function testExecSupply() public {
         deal(WETH, address(instance.account), 10 ether);
-        // Encode the execution data sent to the account
+        supply();
+        assertEq(IERC20(WETH).balanceOf(address(instance.account)), 0);
+    }
 
+    function testExecWithdrawSuccess() public {
+        deal(WETH, address(instance.account), 10 ether);
+        supply();   
         bytes memory supplyData = abi.encode(
             WETH,
             10 ether,
-            address(this),
+            address(instance.account),
+            0,
+            1
+        );
+        instance.exec({
+            target: address(executor),
+            value: 0,
+            callData: abi.encodeWithSelector(
+                ExecutorTemplate.execute.selector,
+                supplyData
+            )
+        });
+        assertGt(IERC20(WETH).balanceOf(address(instance.account)), 10);
+    }
+
+    function supply() public {
+        bytes memory supplyData = abi.encode(
+            WETH,
+            10 ether,
+            address(instance.account),
+            0,
             0
         );
         instance.exec({
@@ -70,9 +95,5 @@ contract ExecutorTemplateTest is RhinestoneModuleKit, Test {
                 supplyData
             )
         });
-        assertEq(
-            IERC20(WETH).balanceOf(address(instance.account)),
-            0
-        );
     }
 }
