@@ -9,6 +9,7 @@ library SmartAAVE {
     enum ActionAAVE {
         SUPPLY,
         WITHDRAW,
+        BORROW,
         VALID
     }
 }
@@ -30,6 +31,18 @@ interface IPool {
     ) external;
 
     function withdraw(address asset, uint256 amount, address to) external;
+
+    function getUserAccountData(address user)
+        external
+        view
+        returns (
+            uint256 totalCollateralBase,
+            uint256 totalDebtBase,
+            uint256 availableBorrowsBase,
+            uint256 currentLiquidationThreshold,
+            uint256 ltv,
+            uint256 healthFactor
+        );
 }
 
 interface IERC20 {
@@ -100,7 +113,7 @@ contract ExecutorTemplate is ERC7579ExecutorBase {
      */
     function execute(bytes calldata data) external {
         (
-            ,
+            address asset,
             uint256 amount,
             address onBehalfOf,
             ,
@@ -111,19 +124,14 @@ contract ExecutorTemplate is ERC7579ExecutorBase {
             );
         require(action < SmartAAVE.ActionAAVE.VALID, "action not valid");
         if (action == SmartAAVE.ActionAAVE.SUPPLY) {
-            _execute(asset0, 0, abi.encodeCall(IERC20.approve, (pool, amount)));
-            _execute(
-                pool,
-                0,
-                abi.encodeCall(IPool.supply, (asset0, amount, onBehalfOf, 0))
-            );
+            _execute(asset, 0, abi.encodeCall(IERC20.approve, (pool, amount)));
+            _execute(pool, 0, abi.encodeCall(IPool.supply, (asset, amount, onBehalfOf, 0)));
         }
         if (action == SmartAAVE.ActionAAVE.WITHDRAW) {
-            _execute(
-                pool,
-                0,
-                abi.encodeCall(IPool.withdraw, (asset0, amount, onBehalfOf))
-            );
+            _execute(pool, 0, abi.encodeCall(IPool.withdraw, (asset, amount, onBehalfOf)));
+        }
+        if (action == SmartAAVE.ActionAAVE.BORROW) {
+            _execute(pool, 0, abi.encodeCall(IPool.borrow, (asset, amount, 2, 0, onBehalfOf)));
         }
     }
 
