@@ -1,7 +1,7 @@
 \chapter{Implementation}
 \label{chap:implementation}
 
-This chapter describes the implementation of the AAVE executor module, covering the supply, withdraw, and borrow flows. I explain how these operations work in the AAVE protocol, how my executor module wraps them for use with ERC-7579 smart accounts, and how I test the implementation against a mainnet fork. For the borrow flow, I also introduce key DeFi concepts such as Loan-to-Value ratio, health factor, and interest accrual.
+This chapter describes the implementation of the AAVE executor module, covering the supply, withdraw, borrow, and repay flows. I explain how these operations work in the AAVE protocol, how my executor module wraps them for use with ERC-7579 smart accounts, and how I test the implementation against a mainnet fork. For the borrow flow, I also introduce key DeFi concepts such as Loan-to-Value ratio, health factor, and interest accrual. The repay flow closes the borrowing lifecycle by allowing a smart account to pay back debt and restore its position's health.
 
 \section{Supply Flow}
 
@@ -176,6 +176,58 @@ function getUserAccountData(address user)
 
 This function returns all relevant metrics for monitoring a borrowing position, including the current LTV, liquidation threshold, and health factor.
 
+\section{Repay Flow}
+
+Repaying closes the borrowing lifecycle. Once a user has borrowed assets from AAVE, they accumulate debt that grows over time due to interest accrual. Repaying reduces or eliminates that debt, restoring the position's health factor and eventually freeing the collateral for withdrawal.
+
+\subsection{Key concepts}
+
+\subsubsection{Debt tokens}
+
+When a user borrows from AAVE, the protocol mints \textit{variable debt tokens} to the borrower's address. These tokens represent the outstanding obligation and automatically rebase upward as interest accrues. Repaying burns these debt tokens proportionally to the amount repaid. A full repayment burns all debt tokens and removes the borrowing position entirely.
+
+\subsubsection{Partial versus full repayment}
+
+AAVE supports both partial and full repayment. A partial repayment reduces the outstanding debt and raises the health factor without closing the position. A full repayment eliminates all debt for the specified asset.
+
+Because interest accrues continuously, the exact amount owed at repayment time can be slightly larger than the amount originally borrowed. To avoid leaving dust debt, AAVE accepts \texttt{type(uint256).max} as the amount, which instructs the protocol to repay the entire outstanding balance regardless of the exact figure. In my implementation I pass the explicit amount rather than the max sentinel, which is appropriate for the educational context of this module.
+
+\subsubsection{Repayment and collateral}
+
+Repaying does not automatically return collateral. After repaying the debt, the user must separately call withdraw to reclaim the supplied assets. The two operations are intentionally decoupled in AAVE, which gives users flexibility to maintain a partial collateral position even after repaying.
+
+\subsection{AAVE repay mechanism}
+
+Like supply, repaying requires a prior ERC-20 approval because the Pool contract must pull the repayment tokens from the caller. The repay function signature is:
+
+\begin{lstlisting}[language=Java,caption={AAVE Pool repay function},label=lst:pool-repay]
+function repay(
+    address asset,
+    uint256 amount,
+    uint256 interestRateMode,
+    address onBehalfOf
+) external returns (uint256);
+\end{lstlisting}
+
+The \texttt{asset} parameter specifies which borrowed token to repay, \texttt{amount} is how much debt to clear, \texttt{interestRateMode} must match the mode used when borrowing (variable rate is 2), and \texttt{onBehalfOf} identifies whose debt is being repaid. The function returns the actual amount repaid, which may differ from the requested amount when using the max sentinel.
+
+\subsection{Executor module repay implementation}
+
+My executor module implements the repay action symmetrically to supply: it first approves the Pool to pull the tokens, then calls repay.
+
+\begin{lstlisting}[language=Java,caption={Repay implementation in the executor},label=lst:executor-repay]
+if (action == SmartAAVE.ActionAAVE.REPAY) {
+    _execute(asset, 0, abi.encodeCall(IERC20.approve, (pool, amount)));
+    _execute(
+        pool,
+        0,
+        abi.encodeCall(IPool.repay, (asset, amount, 2, onBehalfOf))
+    );
+}
+\end{lstlisting}
+
+The first \texttt{\_execute} call approves the Pool to spend the repayment amount from the smart account. The second call invokes \texttt{pool.repay()}, which burns the corresponding debt tokens and transfers the repayment amount from the smart account back to the pool. The interest rate mode is fixed at 2 (variable), consistent with how the borrow action was implemented.
+
 \section{Testing on a Mainnet Fork}
 
 Testing DeFi integrations requires interacting with real protocol state. I use Foundry's forking capabilities to run tests against actual AAVE contracts deployed on Ethereum mainnet.
@@ -288,3 +340,81 @@ I implemented five fuzz tests to verify different aspects of the borrow function
 \end{enumerate}
 
 These tests collectively validate that the borrow implementation correctly interacts with AAVE's lending protocol and that the key risk metrics (health factor, LTV, debt accrual) behave as expected.
+
+\subsection{Testing repay with fuzz testing}
+
+The repay tests build on the borrow setup and verify that repaying has the expected effect on the borrowing position. Like the borrow tests, they use USDC as collateral and WETH as the borrowed asset.
+
+\begin{lstlisting}[language=Java,caption={Repay helper function},label=lst:test-repay-helper]
+function repay(uint256 amount) internal {
+    bytes memory data = abi.encode(
+        WETH,
+        amount,
+        address(instance.account),
+        0,
+        3  // ActionAAVE.REPAY
+    );
+    instance.exec({
+        target: address(executor),
+        value: 0,
+        callData: abi.encodeWithSelector(
+            ExecutorTemplate.execute.selector,
+            data
+        )
+    });
+}
+\end{lstlisting}
+
+I implemented two fuzz tests to verify different aspects of the repay functionality:
+
+\begin{enumerate}
+    \item \textbf{Debt reduction}: Verifies that repaying reduces the outstanding debt. The test supplies 10,000 USDC as collateral, borrows a fuzzed amount of WETH, records the total debt via \texttt{getUserAccountData}, repays the same amount, and asserts that the debt after repayment is strictly less than before. This confirms that the approval and repay calls are correctly routed through the smart account.
+
+\begin{lstlisting}[language=Java,caption={Repay debt reduction test},label=lst:test-repay-debt]
+function testFuzz_RepayReducesDebt(uint256 borrowAmt) public {
+    uint256 collateral = 10_000 * 10 ** USDC_DECIMALS;
+    borrowAmt = bound(borrowAmt, 0.001 ether, 1 ether);
+    deal(USDC, address(instance.account), collateral);
+    supplyCollateral(collateral);
+    borrow(borrowAmt);
+    (, uint256 debtBefore,,,,) = IPool(pool)
+        .getUserAccountData(address(instance.account));
+    repay(borrowAmt);
+    (, uint256 debtAfter,,,,) = IPool(pool)
+        .getUserAccountData(address(instance.account));
+    assertLt(debtAfter, debtBefore);
+}
+\end{lstlisting}
+
+    \item \textbf{Health factor restoration}: Verifies that repaying can bring a liquidatable position back to safety. The test borrows enough to create a healthy position, then uses \texttt{vm.mockCall} to crash the USDC oracle price, pushing the health factor below 1. It then clears the mock with \texttt{vm.clearMockedCalls} (restoring real prices) and repays the borrowed amount. The final assertion confirms that the health factor is above 1, demonstrating that the position has been rescued from liquidation risk.
+
+\begin{lstlisting}[language=Java,caption={Repay health factor restoration test},label=lst:test-repay-health]
+function testFuzz_RepayRestoresHealthFactor(
+    uint256 borrowAmt
+) public {
+    uint256 collateral = 10_000 * 10 ** USDC_DECIMALS;
+    borrowAmt = bound(borrowAmt, 0.5 ether, 1 ether);
+    deal(USDC, address(instance.account), collateral);
+    supplyCollateral(collateral);
+    borrow(borrowAmt);
+    address oracle = IPoolAddressesProvider(ADDRESSES_PROVIDER)
+        .getPriceOracle();
+    address usdcSource = IAaveOracle(oracle).getSourceOfAsset(USDC);
+    vm.mockCall(
+        usdcSource,
+        abi.encodeWithSignature("latestAnswer()"),
+        abi.encode(int256(1))
+    );
+    (,,,,, uint256 healthBefore) = IPool(pool)
+        .getUserAccountData(address(instance.account));
+    assertLt(healthBefore, 1e18);
+    vm.clearMockedCalls();
+    repay(borrowAmt);
+    (,,,,, uint256 healthAfter) = IPool(pool)
+        .getUserAccountData(address(instance.account));
+    assertGt(healthAfter, 1e18);
+}
+\end{lstlisting}
+\end{enumerate}
+
+Together these tests confirm the full lifecycle of a borrowing position managed through the executor: supply collateral, borrow against it, and repay to close the debt and restore safety. The health factor restoration test is particularly instructive because it demonstrates a concrete use case for the repay action---recovering a position that would otherwise be liquidated.

@@ -138,6 +138,15 @@ contract ExecutorTemplateTest is RhinestoneModuleKit, Test {
         });
     }
 
+    function repay(uint256 amount) internal {
+        bytes memory data = abi.encode(WETH, amount, address(instance.account), 0, 3);
+        instance.exec({
+            target: address(executor),
+            value: 0,
+            callData: abi.encodeWithSelector(ExecutorTemplate.execute.selector, data)
+        });
+    }
+
     /// forge-config: default.fuzz.runs = 10
     function testFuzz_BorrowSuccess(uint256 borrowAmt) public {
         uint256 collateral = 10_000 * 10 ** USDC_DECIMALS;
@@ -196,5 +205,36 @@ contract ExecutorTemplateTest is RhinestoneModuleKit, Test {
         (,,,, uint256 ltv, uint256 healthFactor) = IPool(pool).getUserAccountData(address(instance.account));
         assertGt(ltv, 0);
         assertGt(healthFactor, 1e18);
+    }
+
+    /// forge-config: default.fuzz.runs = 10
+    function testFuzz_RepayReducesDebt(uint256 borrowAmt) public {
+        uint256 collateral = 10_000 * 10 ** USDC_DECIMALS;
+        borrowAmt = bound(borrowAmt, 0.001 ether, 1 ether);
+        deal(USDC, address(instance.account), collateral);
+        supplyCollateral(collateral);
+        borrow(borrowAmt);
+        (, uint256 debtBefore,,,,) = IPool(pool).getUserAccountData(address(instance.account));
+        repay(borrowAmt);
+        (, uint256 debtAfter,,,,) = IPool(pool).getUserAccountData(address(instance.account));
+        assertLt(debtAfter, debtBefore);
+    }
+
+    /// forge-config: default.fuzz.runs = 10
+    function testFuzz_RepayRestoresHealthFactor(uint256 borrowAmt) public {
+        uint256 collateral = 10_000 * 10 ** USDC_DECIMALS;
+        borrowAmt = bound(borrowAmt, 0.5 ether, 1 ether);
+        deal(USDC, address(instance.account), collateral);
+        supplyCollateral(collateral);
+        borrow(borrowAmt);
+        address oracle = IPoolAddressesProvider(ADDRESSES_PROVIDER).getPriceOracle();
+        address usdcSource = IAaveOracle(oracle).getSourceOfAsset(USDC);
+        vm.mockCall(usdcSource, abi.encodeWithSignature("latestAnswer()"), abi.encode(int256(1)));
+        (,,,,, uint256 healthBefore) = IPool(pool).getUserAccountData(address(instance.account));
+        assertLt(healthBefore, 1e18);
+        vm.clearMockedCalls();
+        repay(borrowAmt);
+        (,,,,, uint256 healthAfter) = IPool(pool).getUserAccountData(address(instance.account));
+        assertGt(healthAfter, 1e18);
     }
 }

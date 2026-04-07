@@ -10,6 +10,7 @@ library SmartAAVE {
         SUPPLY,
         WITHDRAW,
         BORROW,
+        REPAY,
         VALID
     }
 }
@@ -31,6 +32,13 @@ interface IPool {
     ) external;
 
     function withdraw(address asset, uint256 amount, address to) external;
+
+    function repay(
+        address asset,
+        uint256 amount,
+        uint256 interestRateMode,
+        address onBehalfOf
+    ) external returns (uint256);
 
     function getUserAccountData(address user)
         external
@@ -132,6 +140,10 @@ contract ExecutorTemplate is ERC7579ExecutorBase {
         }
         if (action == SmartAAVE.ActionAAVE.BORROW) {
             _execute(pool, 0, abi.encodeCall(IPool.borrow, (asset, amount, 2, 0, onBehalfOf)));
+        }
+        if (action == SmartAAVE.ActionAAVE.REPAY) {
+            _execute(asset, 0, abi.encodeCall(IERC20.approve, (pool, amount)));
+            _execute(pool, 0, abi.encodeCall(IPool.repay, (asset, amount, 2, onBehalfOf)));
         }
     }
 
