@@ -101,7 +101,10 @@ contract ExecutorTemplate is ERC7579ExecutorBase {
      *
      * @return true if the module is initialized, false otherwise
      */
-    function isInitialized(address smartAccount) external view returns (bool) {}
+    function isInitialized(address smartAccount) external view returns (bool) {
+        smartAccount;
+        return pool != address(0);
+    }
 
     /*//////////////////////////////////////////////////////////////////////////
                                      MODULE LOGIC
